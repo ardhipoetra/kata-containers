@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
+use attestation_agent::{AttestationAgent, AttestationAPIs};
 
 use async_trait::async_trait;
 use rustjail::{pipestream::PipeStream, process::StreamType};
@@ -1247,6 +1248,7 @@ impl agent_ttrpc::AgentService for AgentService {
             ..Default::default()
         })
     }
+    
 
     async fn create_sandbox(
         &self,
@@ -1255,6 +1257,20 @@ impl agent_ttrpc::AgentService for AgentService {
     ) -> ttrpc::Result<Empty> {
         trace_rpc_call!(ctx, "create_sandbox", req);
         is_allowed(&req).await?;
+        
+        let aa = AttestationAgent::new(Some("/aa-conf.toml")).unwrap();
+        warn!(sl(),"RDKATA 0 > getsmh {:?}", aa.get_tee_type());
+
+
+        let tokn: Vec<u8> = aa.get_token("kbs").await.expect("lalaa");
+        warn!(sl(),"RDKATA 0 > getsmh {:?}", tokn);
+
+        if 1 + 1 == 2 {
+            return Err(ttrpc_error(
+                ttrpc::Code::UNAUTHENTICATED,
+                format!("it's error bro"),
+            ))
+        }
 
         {
             let mut s = self.sandbox.lock().await;
@@ -1275,6 +1291,8 @@ impl agent_ttrpc::AgentService for AgentService {
 
             s.setup_shared_namespaces().await.map_ttrpc_err(same)?;
         }
+
+        // RDKATA: possible too
 
         let m = add_storages(sl(), req.storages.clone(), &self.sandbox, None)
             .await
@@ -1305,6 +1323,8 @@ impl agent_ttrpc::AgentService for AgentService {
 
         #[cfg(feature = "guest-pull")]
         image::init_image_service().await.map_ttrpc_err(same)?;
+
+        
 
         Ok(Empty::new())
     }

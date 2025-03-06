@@ -77,6 +77,11 @@ use tokio::{
     task::JoinHandle,
 };
 
+use attestation_agent::{AttestationAgent, AttestationAPIs};
+// use kbs_protocol::KbsClientBuilder;
+// use kbs_protocol::evidence_provider::NativeEvidenceProvider;
+// use attester::{detect_tee_type, BoxedAttester};
+
 #[cfg(feature = "guest-pull")]
 mod image;
 
@@ -419,6 +424,8 @@ async fn start_sandbox(
     let (tx, rx) = tokio::sync::oneshot::channel();
     sandbox.lock().await.sender = Some(tx);
 
+    warn!(logger,"RDKATA > gonna spawn attest bins");
+
     let gc_procs = config.guest_components_procs;
     if !attestation_binaries_available(logger, &gc_procs) {
         warn!(
@@ -442,17 +449,60 @@ async fn start_sandbox(
         oma = Some(ma);
         _ort = Some(rt);
     }
-
+    
+    // first attempt here: failed
+    
+    warn!(logger,"RDKATA > RPC start");
     // vsock:///dev/vsock, port
     let mut server =
         rpc::start(sandbox.clone(), config.server_addr.as_str(), init_mode, oma).await?;
 
+    // second attempt here : also failed
+    
+    warn!(logger,"RDKATA > Server start");
     server.start().await?;
 
+    // last attempt here : WTF ITS OKAY
+    // getsomething(&logger.clone()).await;
     rx.await?;
     server.shutdown().await?;
 
     Ok(())
+}
+
+#[allow(dead_code)]
+async fn getsomething(logger: &Logger,) -> bool {
+    // let aaconfig = attestation_agent::config::Config::new().unwrap();
+    // let tee = detect_tee_type();
+    // let attester: BoxedAttester = tee;
+    // // let attester = Arc::new(attester);
+
+    // let config = tokio::sync::RwLock::new(aaconfig);
+
+    // let mut aa = AttestationAgent {
+    //     config, 
+    //     attester,
+    //     eventlog: None,
+    //     tee
+    // };
+    // aa.init();
+    // let _quote = aa.get_tee_type();
+
+    let aa = AttestationAgent::new(Some("/aa-conf.toml")).unwrap();
+    warn!(logger,"RDKATA > getsmh {:?}", aa.get_tee_type());
+
+
+    let tokn: Vec<u8> = aa.get_token("kbs").await.expect("lalaa");
+    warn!(logger,"RDKATA > getsmh {:?}", tokn);
+
+    
+
+    // let evidence_provider = Box::new(NativeEvidenceProvider::new().unwrap());
+    // let _client = KbsClientBuilder::with_evidence_provider(evidence_provider, "http://141.76.44.95:8008")
+    //      .build()
+    //      .unwrap();
+
+    true
 }
 
 // Check if required attestation binaries are available on the rootfs.
