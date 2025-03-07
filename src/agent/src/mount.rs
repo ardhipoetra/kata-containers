@@ -60,6 +60,8 @@ lazy_static! {
         InitMount{fstype: "tmpfs", src: "tmpfs", dest: "/dev/shm", options: vec!["nosuid", "nodev"]},
         InitMount{fstype: "devpts", src: "devpts", dest: "/dev/pts", options: vec!["nosuid", "noexec"]},
         InitMount{fstype: "tmpfs", src: "tmpfs", dest: "/run", options: vec!["nosuid", "nodev"]},
+        // this might be needed if we succeed running IMA with initrd+agent_init
+        InitMount{fstype: "securityfs", src: "securityfs", dest: "/sys/kernel/security", options: vec!["nosuid", "nodev"]},
     ];
 }
 
