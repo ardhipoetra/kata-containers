@@ -448,11 +448,140 @@ async fn start_sandbox(
         rpc::start(sandbox.clone(), config.server_addr.as_str(), init_mode, oma).await?;
 
     server.start().await?;
-
+    
+    // we can only call the function here, after the agent API is started, and 
+    // update_route/interface has been invoked. 
+    get_token_aa(logger).await;
+    do_kernel_stuff(logger).await;
+    
     rx.await?;
     server.shutdown().await?;
 
     Ok(())
+}
+
+#[allow(unused_imports)]
+use protocols::{
+    attestation_agent::{GetTokenRequest, GetTeeTypeRequest},
+    attestation_agent_ttrpc::AttestationAgentServiceClient,
+};
+#[allow(dead_code)]
+async fn get_token_aa(logger: &Logger) -> bool {
+    warn!(logger,"RDKATA > connecting ttrpc");
+    let inner =
+    ttrpc::asynchronous::Client::connect("unix:///run/confidential-containers/attestation-agent/attestation-agent.sock")
+        .expect("connect ttrpc socket");
+    let client = AttestationAgentServiceClient::new(inner);
+
+    let req = GetTokenRequest {
+        TokenType: "kbs".to_string(),
+        ..Default::default()
+    };
+
+    let res = client
+        .get_token(ttrpc::context::with_timeout(5 * 1000 * 1000 * 1000), &req)
+        .await
+        .expect("request to AA");
+    let token = String::from_utf8(res.Token).unwrap();
+    warn!(logger,"RDKATA > {:?}", token);
+
+    true
+}
+
+pub mod scbindings {
+    #![allow(warnings)] 
+
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+
+use std::convert::TryInto;
+use ed25519_dalek::{VerifyingKey, Signature};
+
+async fn do_kernel_stuff(logger: &Logger) -> bool {
+    fn alloc_buffer(size: usize) -> *mut u8 {
+        let ptr = unsafe { libc::malloc(size) };
+        unsafe { ptr.write_bytes(0, size) }; // memset(0)
+        ptr as *mut u8
+    }
+
+    // do SCONE_IOC_PROVISION_KEY
+    let private_key: &[u8] = &[ 0xa7, 0xc6, 0xe5, 0xa7, 0x3c, 0x2d, 0xee, 0xcf,
+                                0xc9, 0x1b, 0x22, 0xf9, 0x6d, 0x15, 0x3b, 0x66,
+                                0x11, 0xd3, 0x3f, 0x67, 0x0d, 0x44, 0xde, 0x4d,
+                                0xa8, 0x29, 0x46, 0x7b, 0xc4, 0xde, 0x11, 0x7c];
+    
+    let provision = scbindings::scone_provision_key {
+        key: private_key.as_ptr() as *mut std::os::raw::c_void,
+        key_type: scbindings::scone_quote_key_type_KEY_ED25519,
+        key_size: 32u64,
+    };    
+
+    let f = {
+        let fd = nix::fcntl::open("/dev/scone_enclave", OFlag::O_RDONLY, nix::sys::stat::Mode::all());
+        // Wrap fd with `File` to properly close descriptor on exit
+        unsafe { fs::File::from_raw_fd(fd.expect("fd errr")) }
+    };
+
+    let ret = unsafe {
+        libc::ioctl(
+            f.as_raw_fd(),
+            nix::request_code_read!(b'a', 1, std::mem::size_of::<scbindings::scone_provision_key>()),
+            &provision,
+        )
+    };
+
+    warn!(logger,"RDKATA > ioctl SCONE_IOC_PROVISION_KEY return : {:?}", ret);
+    // end SCONE_IOC_PROVISION_KEY
+
+    // do SCONE_IOC_HIEST_INIT
+    let uds: &[u8] = &[ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04];
+
+    let mut args = scbindings::scone_hiest_init {
+        uds: uds.try_into().map_err(|_| ()).expect("try_into fails"),
+        out: scbindings::scone_cert_t { 
+            body: &mut scbindings::scone_cert_body_t {
+                author_pubkey: [0u8;32],
+                subject_pubkey: [0u8;32],
+                measurement: [0u8;32],
+            } as *mut scbindings::scone_cert_body_t,
+            cert_signature: alloc_buffer(64),
+        },
+    }; 
+
+    nix::ioctl_readwrite!(sc_hiest_init, b'a', 12, scbindings::scone_hiest_init);
+
+    let f = {
+        let fd = nix::fcntl::open("/dev/scone_enclave", OFlag::O_RDONLY, nix::sys::stat::Mode::all());
+        // Wrap fd with `File` to properly close descriptor on exit
+        unsafe { fs::File::from_raw_fd(fd.expect("fd errr")) }
+    };
+    unsafe {
+        let ret = sc_hiest_init(f.as_raw_fd(), &mut args);
+        warn!(logger,"RDKATA > ioctl SCONE_IOC_HIEST_INIT return : {:?} signature: {:02X?} measurement:{:02X?}", ret, 
+            std::slice::from_raw_parts(args.out.cert_signature, 64),
+            (*args.out.body).measurement,
+        );
+    }
+
+    // verify the cert
+    let body = unsafe {(*args.out.body).clone()};
+    let public_key = VerifyingKey::from_bytes( &body.author_pubkey )
+        .expect("Verif-key from_bytes fails");
+    let signature = Signature::from_bytes( unsafe {
+        &mut *(args.out.cert_signature as *mut [u8; 64])
+    });
+
+    let body_v: Vec<u8> = [body.author_pubkey, body.subject_pubkey, body.measurement].concat();
+    
+    let ret = public_key.verify_strict(&body_v, &signature);
+    warn!(logger,"RDKATA > verify cert return : {:?}", ret);
+
+    // end SCONE_IOC_HIEST_INIT
+
+    true
 }
 
 // Check if required attestation binaries are available on the rootfs.
