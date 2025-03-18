@@ -585,6 +585,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.71.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f58bf3d7db68cfbac37cfc485a8d711e87e064c3d0fe0435b92f7a407f9d6b3"
+dependencies = [
+ "bitflags 2.6.0",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.11.0",
+ "log",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash 2.1.1",
+ "shlex",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "binstring"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3006,6 +3026,7 @@ dependencies = [
  "async-recursion 0.3.2",
  "async-std",
  "async-trait",
+ "bindgen 0.71.1",
  "capctl",
  "cdi",
  "cfg-if 1.0.0",
@@ -3013,6 +3034,7 @@ dependencies = [
  "clap 3.2.25",
  "const_format",
  "derivative",
+ "ed25519-dalek",
  "futures",
  "image-rs",
  "ipnetwork",
@@ -3479,7 +3501,7 @@ name = "loopdev"
 version = "0.5.0"
 source = "git+https://github.com/mdaffin/loopdev?rev=c9f91e8f0326ce8a3364ac911e81eb32328a5f27#c9f91e8f0326ce8a3364ac911e81eb32328a5f27"
 dependencies = [
- "bindgen",
+ "bindgen 0.63.0",
  "errno 0.2.8",
  "libc",
 ]
@@ -4502,6 +4524,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
+name = "prettyplease"
+version = "0.2.30"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1ccf34da56fc294e7d4ccf69a85992b7dfb826b7cf57bac6a70bba3494cc08a"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "primeorder"
 version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5506,7 +5538,7 @@ dependencies = [
  "aes",
  "aes-gcm",
  "anyhow",
- "base64 0.21.7",
+ "base64 0.22.1",
  "block-padding",
  "blowfish",
  "buffered-reader",

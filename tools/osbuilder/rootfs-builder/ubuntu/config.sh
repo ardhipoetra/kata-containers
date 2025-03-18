@@ -12,6 +12,8 @@ PACKAGES="chrony iptables dbus"
 [ "$SECCOMP" = yes ] && PACKAGES+=" libseccomp2"
 REPO_URL=http://ports.ubuntu.com
 
+PACKAGES+=" kmod"
+
 case "$ARCH" in
 	aarch64) DEB_ARCH=arm64;;
 	ppc64le) DEB_ARCH=ppc64el;;
