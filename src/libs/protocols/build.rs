@@ -183,6 +183,8 @@ fn codegen(path: &str, protos: &[&str], async_all: bool) -> Result<(), std::io::
     Ok(())
 }
 fn real_main() -> Result<(), std::io::Error> {
+    codegen("src", &["protos/attestation_agent.proto"], true)?;
+
     codegen(
         "src",
         &[
