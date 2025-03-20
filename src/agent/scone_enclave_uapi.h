@@ -23,6 +23,8 @@ typedef struct scone_cert_body_s {
     uint8_t author_pubkey[32];
     uint8_t subject_pubkey[32];
     uint8_t measurement[32];
+    uint8_t cdi_hash[32];
+    uint8_t prev_cert_hash[32];
 } scone_cert_body_t;
 
 typedef struct scone_cert_s {
