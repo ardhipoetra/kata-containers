@@ -15,6 +15,7 @@
 #define SCONE_IOC_GET_SIGNED_QUOTE  _IOWR('a', 5, struct scone_enclave_get_quote)
 #define SCONE_IOC_CERT              _IOWR('a', 11, scone_cert_t)
 #define SCONE_IOC_DICE_INIT         _IOWR('a', 12, struct scone_dice_init)
+#define SCONE_IOC_DICE              _IOR ('a', 13, struct scone_dice)
 
 #define ED25519_KEY_SIZE 32
 
@@ -28,6 +29,11 @@ typedef struct scone_cert_s {
     scone_cert_body_t *body;
     uint8_t* cert_signature;
 } scone_cert_t;
+
+struct scone_dice {
+    uint8_t* cdi;
+    scone_cert_t out;
+};
 
 struct scone_dice_init {
     uint8_t uds[32];

@@ -581,6 +581,36 @@ async fn do_kernel_stuff(logger: &Logger) -> bool {
 
     // end SCONE_IOC_DICE_INIT
 
+
+    // do SCONE_IOC_DICE
+    // let mut args = scbindings::scone_dice {
+    //     cdi: alloc_buffer(32),
+    //     out: scbindings::scone_cert_t { 
+    //         body: &mut scbindings::scone_cert_body_t {
+    //             author_pubkey: [0u8;32],
+    //             subject_pubkey: [0u8;32],
+    //             measurement: [0u8;32],
+    //         } as *mut scbindings::scone_cert_body_t,
+    //         cert_signature: alloc_buffer(64),
+    //     },
+    // }; 
+
+    // nix::ioctl_read!(sc_dice, b'a', 13, scbindings::scone_dice);
+
+    // let f = {
+    //     let fd = nix::fcntl::open("/dev/scone_enclave", OFlag::O_RDONLY, nix::sys::stat::Mode::all());
+    //     // Wrap fd with `File` to properly close descriptor on exit
+    //     unsafe { fs::File::from_raw_fd(fd.expect("fd errr")) }
+    // };
+    // unsafe {
+    //     let ret = sc_dice(f.as_raw_fd(), &mut args);
+    //     warn!(logger,"RDKATA > ioctl SCONE_IOC_DICE return : {:?} signature: {:02X?} cdi:{:02X?}", ret, 
+    //         std::slice::from_raw_parts(args.out.cert_signature, 64),
+    //         std::slice::from_raw_parts(args.cdi, 32),
+    //     );
+    // }
+    // end SCONE_IOC_DICE
+
     true
 }
 
