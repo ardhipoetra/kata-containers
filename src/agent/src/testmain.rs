@@ -22,6 +22,8 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 author_pubkey: [0u8;32],
                 subject_pubkey: [0u8;32],
                 measurement: [0u8;32],
+                cdi_hash: [0u8;32],
+                prev_cert_hash: [0u8;32],
             } as *mut scbindings::scone_cert_body_t,
             cert_signature: alloc_buffer(64),
         },
@@ -38,7 +40,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     
     unsafe {
         let ret = sc_dice(f.as_raw_fd(), &mut args);
-        println!("ioctl SCONE_IOC_DICE return : {:?}", ret);
+        println!("ioctl SCONE_IOC_DICE return : {:?}\n", ret);
     }
 
     // verify the cert
@@ -50,6 +52,8 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("author_public_key: {:?}", hex(&body.author_pubkey));
     println!("subject_public_key: {:?}", hex(&body.subject_pubkey));
     println!("measurement: {:?}", hex(&body.measurement));
+    println!("cdi_hash: {:?}", hex(&body.cdi_hash));
+    println!("prev_cert_hash: {:?}", hex(&body.prev_cert_hash));
 
     let signature = Signature::from_bytes( unsafe {
         &mut *(args.out.cert_signature as *mut [u8; 64])
@@ -57,7 +61,8 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let slice_sign = unsafe {std::slice::from_raw_parts(args.out.cert_signature, 64)};
     println!("signature: {:?}", hex(&<[u8; 64]>::try_from(slice_sign).expect("Slice length must match array size")));
     
-    let body_v: Vec<u8> = [body.author_pubkey, body.subject_pubkey, body.measurement].concat();
+    let body_v: Vec<u8> = [body.author_pubkey, body.subject_pubkey, body.measurement,
+        body.cdi_hash, body.prev_cert_hash].concat();
     
     let ret = author_public_key.verify_strict(&body_v, &signature);
     match ret {
@@ -72,7 +77,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let slice_cdi = unsafe {std::slice::from_raw_parts(args.cdi, 32)};
     println!("\n***Connecting the CDI***\n");
 
-    let cdi_kata = "6986219f81b895e17b3e8266ad4231047cfdddbbb01d80eaaf8d439b156b0726";
+    let cdi_kata = "b2c7ba1c3eb17e20097b906a28a091697184704adbd1a1be08a1a4158961e807";
 
     println!("Suppose the KA CDI is (hardcoded): {}", cdi_kata);
 
@@ -89,7 +94,12 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let result = hasher.finalize();
 
     println!("SHA256 hash\t: {:x}", result);
-    println!("my CDI\t\t: {}", hex(&<[u8; 32]>::try_from(slice_cdi).expect("Slice length must match array size")));
+    println!("my CDI\t\t: {} (should be same as above)", hex(&<[u8; 32]>::try_from(slice_cdi).expect("Slice length must match array size")));
+    
+    let mut hasher = Sha256::new();
+    hasher.update(&<[u8; 32]>::try_from(slice_cdi).expect("Slice length must match array size"));
+    let result = hasher.finalize();
+    println!("my CDI hash\t: {:x}", result);
 
     Ok(())
 }
