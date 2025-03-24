@@ -91,6 +91,8 @@ func sandboxDevices() []specs.LinuxDeviceCgroup {
 	tunMajor := int64(10)
 	tunMinor := int64(200)
 
+	sconeMinor := int64(125)
+
 	wildcardDevices := []specs.LinuxDeviceCgroup{
 		// allow mknod for any device
 		{
@@ -122,6 +124,14 @@ func sandboxDevices() []specs.LinuxDeviceCgroup {
 			Major:  &tunMajor,
 			Minor:  &tunMinor,
 			Access: "rwm",
+		},
+		// scone_enclave?
+		{
+			Allow:  true,
+			Type:   "c",
+			Major:  &tunMajor,
+			Minor:  &sconeMinor,
+			Access: "rw",
 		},
 	}
 

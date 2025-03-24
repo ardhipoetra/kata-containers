@@ -467,6 +467,10 @@ func (c *Container) mountSharedDirMounts(ctx context.Context, sharedDirMounts, i
 			continue
 		}
 
+		if m.Destination == "/dev/scone_enclave" {
+			continue
+		}
+
 		// Ignore /dev, directories and all other device files. We handle
 		// only regular files in /dev. It does not make sense to pass the host
 		// device nodes to the guest.

@@ -152,7 +152,7 @@ lazy_static! {
     };
 
     pub static ref DEFAULT_DEVICES: Vec<LinuxDevice> = {
-        vec![
+        let mut devices = vec![
             oci::LinuxDeviceBuilder::default()
                 .path(PathBuf::from("/dev/null"))
                 .typ(oci::LinuxDeviceType::C)
@@ -213,10 +213,41 @@ lazy_static! {
                 .gid(0xffffffff_u32)
                 .build()
                 .unwrap(),
-        ]
+        ];
+
+        // Read and parse SEV guest device major:minor
+        if let Ok(content) = fs::read_to_string("/sys/devices/virtual/misc/scone_enclave/dev") {
+            if let Some((major, minor)) = parse_dev_numbers(&content) {
+                devices.push(
+                    oci::LinuxDeviceBuilder::default()
+                        .path(PathBuf::from("/dev/scone_enclave"))
+                        .typ(oci::LinuxDeviceType::C)
+                        .major(major)
+                        .minor(minor)
+                        .file_mode(0o600_u32)
+                        .uid(0xffffffff_u32)
+                        .gid(0xffffffff_u32)
+                        .build()
+                        .unwrap()
+                );
+            }
+        }
+
+        devices
     };
 
     pub static ref SYSTEMD_CGROUP_PATH_FORMAT:Regex = Regex::new(r"^[\w\-.]*:[\w\-.]*:[\w\-.]*$").unwrap();
+}
+
+fn parse_dev_numbers(content: &str) -> Option<(i64, i64)> {
+    let parts: Vec<&str> = content.trim().split(':').collect();
+    if parts.len() == 2 {
+        let major = parts[0].parse::<i64>().ok()?;
+        let minor = parts[1].parse::<i64>().ok()?;
+        Some((major, minor))
+    } else {
+        None
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
