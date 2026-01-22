@@ -1,0 +1,13 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index eb4a6ea..04fcaa2 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -83,6 +83,8 @@ pub struct Attestation {
+     pub tee_pubkey: TeePubKey,
+     #[serde(rename = "tee-evidence")]
+     pub tee_evidence: Value,
++    #[serde(rename = "diceinit")]
++    pub diceinit: String,
+ }
+ 
+ #[derive(Clone, Serialize, Deserialize, Debug)]
