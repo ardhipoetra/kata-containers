@@ -15,7 +15,11 @@
 #define SCONE_IOC_GET_SIGNED_QUOTE  _IOWR('a', 5, struct scone_enclave_get_quote)
 #define SCONE_IOC_CERT              _IOWR('a', 11, scone_cert_t)
 #define SCONE_IOC_DICE_INIT         _IOWR('a', 12, struct scone_dice_init)
-#define SCONE_IOC_DICE              _IOR ('a', 13, struct scone_dice)
+#define SCONE_IOC_DICE              _IOWR('a', 13, struct scone_dice)
+#define SCONE_IOC_DICE_SELF         _IOR ('a', 14, struct scone_dice_self)
+#define SCONE_IOC_DICE_SIGN         _IOWR('a', 15, struct scone_dice_sign)
+#define SCONE_IOC_DICE_INIT_NEW     _IO ('a', 16)
+#define SCONE_IOC_DICE_INIT_GET     _IOR('a', 17, struct scone_dice_init_get)
 
 #define ED25519_KEY_SIZE 32
 
@@ -32,14 +36,35 @@ typedef struct scone_cert_s {
     uint8_t* cert_signature;
 } scone_cert_t;
 
-struct scone_dice {
+struct scone_dice_self {
     uint8_t* cdi;
+    scone_cert_t out[2];
+};
+
+struct scone_dice {
+    uint8_t fd;
+    uint8_t* cdi_in; // this one is not used anymore (CDI is a secret) - previously CDI of current layer
+    uint8_t* cdi;   //  this too, historically this is the CDI of the *new* layer
+    scone_cert_t* cert_in;
     scone_cert_t out;
 };
 
 struct scone_dice_init {
     uint8_t uds[32];
     scone_cert_t out;
+};
+
+struct scone_dice_sign {
+    uint8_t fd;
+    uint8_t* data;
+    uint8_t data_size;
+    uint8_t* cert_signature_in;
+    
+    uint8_t signature_out[64];
+};
+
+struct scone_dice_init_get {
+    uint8_t pubkey[32];
 };
 
 enum scone_page_flags {
