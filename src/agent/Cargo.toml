@@ -29,6 +29,9 @@ kata-sys-util = { path = "../libs/kata-sys-util" }
 kata-types = { path = "../libs/kata-types" }
 safe-path = { path = "../libs/safe-path" }
 const_format = "0.2.30"
+prost = "0.8"
+prost-derive = "0.8"
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "blocking"] }
 
 # Async helpers
 async-trait = "0.1.42"

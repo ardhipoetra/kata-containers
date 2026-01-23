@@ -453,7 +453,11 @@ async fn start_sandbox(
     // update_route/interface has been invoked. 
     do_kernel_dice_init_key(logger).await;
     get_token_aa(logger).await;
-    do_kernel_stuff(logger).await;
+    let ret = do_kernel_stuff(logger).await;
+    if ret == false {
+        error!(logger, "do_kernel_stuff failed");
+        Err(anyhow!("do_kernel_stuff failed"))?
+    }
     
     rx.await?;
     server.shutdown().await?;
@@ -466,6 +470,52 @@ use protocols::{
     attestation_agent::{GetTokenRequest, GetTeeTypeRequest},
     attestation_agent_ttrpc::AttestationAgentServiceClient,
 };
+
+use prost::Message;
+use reqwest;
+/**
+ * The following protobuf to py-kbs: 22.01.26
+message SconeCertBody {
+  bytes author_pubkey = 1;
+  bytes subject_pubkey = 2;
+  bytes measurement = 3;
+  bytes cdi_hash = 4;
+  bytes prev_cert_hash = 5;
+}
+
+message SconeCert {
+  SconeCertBody body = 1;
+  bytes cert_signature = 2;
+}
+ */
+// message SconeCertBody
+#[derive(Clone, PartialEq, Message)]
+pub struct SconeCertBody {
+    #[prost(bytes = "vec", tag = "1")]
+    pub author_pubkey: Vec<u8>,
+
+    #[prost(bytes = "vec", tag = "2")]
+    pub subject_pubkey: Vec<u8>,
+
+    #[prost(bytes = "vec", tag = "3")]
+    pub measurement: Vec<u8>,
+
+    #[prost(bytes = "vec", tag = "4")]
+    pub cdi_hash: Vec<u8>,
+
+    #[prost(bytes = "vec", tag = "5")]
+    pub prev_cert_hash: Vec<u8>,
+}
+
+// message SconeCert
+#[derive(Clone, PartialEq, Message)]
+pub struct SconeCert {
+    #[prost(message, optional, tag = "1")]
+    pub body: Option<SconeCertBody>,
+    #[prost(bytes = "vec", tag = "2")]
+    pub cert_signature: Vec<u8>,
+}
+
 #[allow(dead_code)]
 async fn get_token_aa(logger: &Logger) -> bool {
     warn!(logger,"RDKATA > connecting ttrpc");
@@ -525,32 +575,32 @@ async fn do_kernel_stuff(logger: &Logger) -> bool {
     }
 
     // do SCONE_IOC_PROVISION_KEY
-    let private_key: &[u8] = &[ 0xa7, 0xc6, 0xe5, 0xa7, 0x3c, 0x2d, 0xee, 0xcf,
-                                0xc9, 0x1b, 0x22, 0xf9, 0x6d, 0x15, 0x3b, 0x66,
-                                0x11, 0xd3, 0x3f, 0x67, 0x0d, 0x44, 0xde, 0x4d,
-                                0xa8, 0x29, 0x46, 0x7b, 0xc4, 0xde, 0x11, 0x7c];
+    // let private_key: &[u8] = &[ 0xa7, 0xc6, 0xe5, 0xa7, 0x3c, 0x2d, 0xee, 0xcf,
+    //                             0xc9, 0x1b, 0x22, 0xf9, 0x6d, 0x15, 0x3b, 0x66,
+    //                             0x11, 0xd3, 0x3f, 0x67, 0x0d, 0x44, 0xde, 0x4d,
+    //                             0xa8, 0x29, 0x46, 0x7b, 0xc4, 0xde, 0x11, 0x7c];
     
-    let provision = scbindings::scone_provision_key {
-        key: private_key.as_ptr() as *mut std::os::raw::c_void,
-        key_type: scbindings::scone_quote_key_type_KEY_ED25519,
-        key_size: 32u64,
-    };    
+    // let provision = scbindings::scone_provision_key {
+    //     key: private_key.as_ptr() as *mut std::os::raw::c_void,
+    //     key_type: scbindings::scone_quote_key_type_KEY_ED25519,
+    //     key_size: 32u64,
+    // };    
 
-    let f = {
-        let fd = nix::fcntl::open("/dev/scone_enclave", OFlag::O_RDONLY, nix::sys::stat::Mode::all());
-        // Wrap fd with `File` to properly close descriptor on exit
-        unsafe { fs::File::from_raw_fd(fd.expect("fd errr")) }
-    };
+    // let f = {
+    //     let fd = nix::fcntl::open("/dev/scone_enclave", OFlag::O_RDONLY, nix::sys::stat::Mode::all());
+    //     // Wrap fd with `File` to properly close descriptor on exit
+    //     unsafe { fs::File::from_raw_fd(fd.expect("fd errr")) }
+    // };
 
-    let ret = unsafe {
-        libc::ioctl(
-            f.as_raw_fd(),
-            nix::request_code_read!(b'a', 1, std::mem::size_of::<scbindings::scone_provision_key>()),
-            &provision,
-        )
-    };
+    // let ret = unsafe {
+    //     libc::ioctl(
+    //         f.as_raw_fd(),
+    //         nix::request_code_read!(b'a', 1, std::mem::size_of::<scbindings::scone_provision_key>()),
+    //         &provision,
+    //     )
+    // };
 
-    warn!(logger,"RDKATA > ioctl SCONE_IOC_PROVISION_KEY return : {:?}", ret);
+    // warn!(logger,"RDKATA > ioctl SCONE_IOC_PROVISION_KEY return : {:?}", ret);
     // end SCONE_IOC_PROVISION_KEY
 
     // do SCONE_IOC_DICE_INIT
@@ -601,6 +651,35 @@ async fn do_kernel_stuff(logger: &Logger) -> bool {
     
     let ret = public_key.verify_strict(&body_v, &signature);
     warn!(logger,"RDKATA > verify cert return : {:?}", ret);
+
+    // ask py-kbs tp attest the KA on behalf of VM
+    let init_cert = SconeCert {
+        body: Some(SconeCertBody {
+            author_pubkey: body.author_pubkey.to_vec(),
+            subject_pubkey: body.subject_pubkey.to_vec(),
+            measurement: body.measurement.to_vec(),
+            cdi_hash: body.cdi_hash.to_vec(),
+            prev_cert_hash: body.prev_cert_hash.to_vec(),
+        }),
+        cert_signature: unsafe {
+            std::slice::from_raw_parts(args.out.cert_signature, 64).to_vec()
+        },
+    };
+
+    let pyclient = reqwest::Client::new();
+    let res = pyclient.post("http://141.76.44.115:5000/attest_init")
+        .header("Content-Type", "application/x-protobuf")
+        .body(init_cert.encode_to_vec())
+        .send()
+        .await.unwrap();
+
+    if res.status().is_success() {
+        info!(logger,"Success! ");
+    } else {
+        error!(logger,"Failed: Status {}", res.status());
+        error!(logger,"Body: {}", res.text().await.unwrap());
+        return false;
+    }
 
     // end SCONE_IOC_DICE_INIT
 
