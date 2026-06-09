@@ -84,6 +84,7 @@ image-rs = { git = "https://github.com/confidential-containers/guest-components"
 cdi = { git = "https://github.com/cncf-tags/container-device-interface-rs", rev = "fba5677a8e7cc962fc6e495fcec98d7d765e332a" }
 kata-agent-policy = { path = "policy", optional = true }
 ed25519-dalek = "2.1.1"
+sha2 = "0.10.8"
 
 [build-dependencies]
 bindgen = "0.71.1"
@@ -112,3 +113,8 @@ guest-pull = ["image-rs/kata-cc-rustls-tls"]
 [[bin]]
 name = "kata-agent"
 path = "src/main.rs"
+
+[[bin]]
+name = "testmain"
+path = "src/testmain.rs"
+

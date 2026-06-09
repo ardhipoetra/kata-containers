@@ -546,6 +546,8 @@ async fn do_kernel_stuff(logger: &Logger) -> bool {
                 author_pubkey: [0u8;32],
                 subject_pubkey: [0u8;32],
                 measurement: [0u8;32],
+                cdi_hash: [0u8;32],
+                prev_cert_hash: [0u8;32],
             } as *mut scbindings::scone_cert_body_t,
             cert_signature: alloc_buffer(64),
         },
@@ -574,7 +576,8 @@ async fn do_kernel_stuff(logger: &Logger) -> bool {
         &mut *(args.out.cert_signature as *mut [u8; 64])
     });
 
-    let body_v: Vec<u8> = [body.author_pubkey, body.subject_pubkey, body.measurement].concat();
+    let body_v: Vec<u8> = [body.author_pubkey, body.subject_pubkey, body.measurement, 
+        body.cdi_hash, body.prev_cert_hash].concat();
     
     let ret = public_key.verify_strict(&body_v, &signature);
     warn!(logger,"RDKATA > verify cert return : {:?}", ret);
