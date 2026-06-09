@@ -451,6 +451,7 @@ async fn start_sandbox(
     
     // we can only call the function here, after the agent API is started, and 
     // update_route/interface has been invoked. 
+    do_kernel_hiest_init_key(logger).await;
     get_token_aa(logger).await;
     do_kernel_stuff(logger).await;
     
@@ -478,6 +479,8 @@ async fn get_token_aa(logger: &Logger) -> bool {
         ..Default::default()
     };
 
+    warn!(logger,"RDKATA > getting token from AA");
+
     let res = client
         .get_token(ttrpc::context::with_timeout(5 * 1000 * 1000 * 1000), &req)
         .await
@@ -497,6 +500,23 @@ pub mod scbindings {
 use std::convert::TryInto;
 use ed25519_dalek::{VerifyingKey, Signature};
 
+#[allow(dead_code)]
+async fn do_kernel_hiest_init_key(logger: &Logger) -> bool {
+    nix::ioctl_none!(sc_init_new, b'a', 16);
+    let f = {
+        let fd = nix::fcntl::open("/dev/scone_enclave", OFlag::O_RDONLY, nix::sys::stat::Mode::all());
+        // Wrap fd with `File` to properly close descriptor on exit
+        unsafe { fs::File::from_raw_fd(fd.expect("fd errr")) }
+    };
+    unsafe {
+        let ret = sc_init_new(f.as_raw_fd());
+        warn!(logger,"RDKATA > ioctl SCONE_IOC_HIEST_INIT_NEW return : {:?}", ret);
+    }
+
+    return true;
+}
+
+#[allow(dead_code)]
 async fn do_kernel_stuff(logger: &Logger) -> bool {
     fn alloc_buffer(size: usize) -> *mut u8 {
         let ptr = unsafe { libc::malloc(size) };
